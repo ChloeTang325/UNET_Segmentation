@@ -4,6 +4,7 @@ from keras.optimizers import *
 from keras.callbacks import ModelCheckpoint
 from keras.preprocessing.image import array_to_img
 import cv2
+from Data_processing import *
 
 # Implement UNET to generate lung masks for COVID Dataset1
 # Image size: (512,512,100)
@@ -13,13 +14,15 @@ class lungMaskUnet(object):
         self.img_rows = img_rows
         self.img_cols = img_cols
     
-    # need a method here to load all image/data in
-    # load image need to have:
-    # img_train, mask_train, img_test
-    
-    # metadata loc: ~/code/Segmentation/metadata.csv
-    # image data under column: 'CT_image_path'; corresponding lung mask column: 'lung_mask_path'
+    ## Load image in ##
+    def load_data(self):
+        image_data = dataProcess(self.img_rows, self.img_cols)
+        image_train, lung_mask_train = image_data.load_train_data()
+        image_test = image_data.load_test_data()
+        return image_train, lung_mask_train, image_test
 
+
+    ## define UNET structure ##
     def test_unet(self):
         inputs = Input((self.img_rows, self.img_cols, 3))
 
@@ -99,20 +102,23 @@ class lungMaskUnet(object):
     
     def train(self):
         # load image
-            # Code here
-            
+        image_train, lung_mask_train, image_test = self.load_data()
+        print("Data loading complete!")
+        # get model
+        model = self.test_unet() 
         # model train
-        model = self.test_unet()
         model_checkpoint = ModelCheckpoint('unet.hdf5', monitor='loss', verbose=1, save_best_only=True)
         #fit model according to checkpoint
-        model.fit(img_train, mask_train, batch_size=2, epochs=50, verbose=1, validation_split=0.2, shuffle=True, callbacks=[model_checkpoint])
+        model.fit(image_train, lung_mask_train, batch_size=4, epochs=50, verbose=1, validation_split=0.2, shuffle=True, callbacks=[model_checkpoint])
         # predict testing data
-        mask_test = model.predict(img_test, batch_size=1, verbose=1)
+        lung_mask_test = model.predict(image_test, batch_size=1, verbose=1)
         # save results as numpy array
-        # np.save([address to be saved])
+        save_to_path = '/datadrive/COVID_CT_Images/UNET_pred_result_220203/lung_mask_predict_1.npy'
+        np.save(save_to_path, lung_mask_test)
+    
+    ## Need a method to visualize the predicted testing mask using cv2 probably ##
     
 if __name__ == '__main__':
     myunet = lungMaskUnet()
     model = myunet.test_unet()
     myunet.train()
-    # save
